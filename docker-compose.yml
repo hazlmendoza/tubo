@@ -1,0 +1,83 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: tubo-api
+    restart: unless-stopped
+
+    env_file:
+      - ./api/.env
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    ports:
+      - "8000:80"
+
+    networks:
+      - tubo
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: tubo-web
+    restart: unless-stopped
+
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+
+    depends_on:
+      - api
+
+    ports:
+      - "3000:3000"
+
+    networks:
+      - tubo
+
+  mysql:
+    image: mysql:8.4
+    container_name: tubo-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: tubo-database
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: tubo
+      MYSQL_PASSWORD: tubo_password
+
+    volumes:
+      - tubo_mysql:/var/lib/mysql
+
+    ports:
+      - "3306:3306"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-proot"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+    networks:
+      - tubo
+
+networks:
+  tubo:
+    driver: bridge
+
+volumes:
+  tubo_mysql:
