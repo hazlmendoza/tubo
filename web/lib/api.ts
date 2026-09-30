@@ -1,6 +1,16 @@
-const API_BASE = "/api"
+const configuredApiOrigin = process.env.NEXT_PUBLIC_API_URL?.trim()
+
+const API_ORIGIN = (
+  configuredApiOrigin ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : "")
+).replace(/\/$/, "")
+
+const API_BASE = `${API_ORIGIN}/api`
 
 let csrfInitialized = false
+let csrfInitialization: Promise<void> | null = null
 
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null
@@ -15,42 +25,56 @@ function getCookie(name: string): string | null {
 }
 
 /**
- * Initialize Laravel Sanctum CSRF protection once.
+ * Initialize Laravel Sanctum CSRF protection.
  */
-export async function getCsrfCookie() {
+export async function getCsrfCookie(): Promise<void> {
   if (csrfInitialized) return
 
-  const response = await fetch("/sanctum/csrf-cookie", {
-    method: "GET",
-    credentials: "include",
-    cache: "no-store",
-  })
+  if (!csrfInitialization) {
+    csrfInitialization = (async () => {
+      const csrfUrl = `${API_ORIGIN}/sanctum/csrf-cookie`
 
-  if (!response.ok) {
-    throw new Error("Unable to initialize CSRF protection.")
+      console.log("SANCTUM CSRF URL:", csrfUrl)
+
+      const response = await fetch(csrfUrl, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      })
+
+      if (!response.ok) {
+        throw new Error(
+          `Unable to initialize CSRF protection. Status: ${response.status}`
+        )
+      }
+    })()
   }
 
-  csrfInitialized = true
+  try {
+    await csrfInitialization
+    csrfInitialized = true
+  } finally {
+    csrfInitialization = null
+  }
 }
 
-/**
- * Reset CSRF state after logout/session changes.
- */
 export function resetCsrf() {
   csrfInitialized = false
+  csrfInitialization = null
 }
 
-/**
- * Send a request to the Laravel API.
- */
 export async function apiFetch<T = unknown>(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<T> {
   const method = (options.method ?? "GET").toUpperCase()
-  const isStateChanging = !["GET", "HEAD", "OPTIONS"].includes(method)
 
-  // Initialize Sanctum before state-changing requests.
+  const isStateChanging = ![
+    "GET",
+    "HEAD",
+    "OPTIONS",
+  ].includes(method)
+
   if (isStateChanging) {
     await getCsrfCookie()
   }
@@ -63,7 +87,6 @@ export async function apiFetch<T = unknown>(
     headers.set("Content-Type", "application/json")
   }
 
-  // Send Laravel's CSRF token.
   if (isStateChanging) {
     const xsrfToken = getCookie("XSRF-TOKEN")
 
@@ -72,22 +95,28 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    method,
-    headers,
-    credentials: "include",
-    cache: "no-store",
-  })
+  const response = await fetch(
+    `${API_BASE}${endpoint}`,
+    {
+      ...options,
+      method,
+      headers,
+      credentials: "include",
+      cache: "no-store",
+    }
+  )
 
-  const contentType = response.headers.get("content-type") ?? ""
+  const contentType =
+    response.headers.get("content-type") ?? ""
 
   const data = contentType.includes("application/json")
     ? await response.json()
     : await response.text()
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, response.status))
+    throw new Error(
+      getApiErrorMessage(data, response.status)
+    )
   }
 
   return data as T
@@ -95,7 +124,7 @@ export async function apiFetch<T = unknown>(
 
 function getApiErrorMessage(
   data: unknown,
-  status: number,
+  status: number
 ): string {
   if (typeof data !== "object" || data === null) {
     return `Request failed with status ${status}.`
@@ -109,7 +138,10 @@ function getApiErrorMessage(
   if (errorData.errors) {
     const firstError = Object.values(errorData.errors)
       .flat()
-      .find((message) => typeof message === "string")
+      .find(
+        (message) =>
+          typeof message === "string"
+      )
 
     if (firstError) return firstError
   }

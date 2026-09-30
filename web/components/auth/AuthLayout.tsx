@@ -1,5 +1,3 @@
-"use client"
-
 import React from "react"
 import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
@@ -28,7 +26,7 @@ export default function AuthLayout({
           className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Mellow Cup
+          Back to Tubo
         </Link>
 
         <div className="rounded-[2rem] border border-border bg-card p-6 shadow-sm sm:p-8">
@@ -54,7 +52,7 @@ export default function AuthLayout({
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Mellow Cup Café · Sip Slow. Stay Sweet.
+          Tubo Invoicing Platform
         </p>
       </div>
     </main>

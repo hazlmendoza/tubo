@@ -1,32 +1,40 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+namespace App\Models;
 
-return new class extends Migration
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
 {
-    public function up(): void
+    use HasFactory;
+    use Notifiable;
+
+    protected $fillable = [
+        'company_id',
+        'name',
+        'email',
+        'password',
+        'role',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected function casts(): array
     {
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-
-            $table->foreignId('company_id')
-                ->constrained('companies')
-                ->cascadeOnDelete();
-
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
-
-            $table->rememberToken();
-            $table->timestamps();
-        });
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
     }
 
-    public function down(): void
+    public function company(): BelongsTo
     {
-        Schema::dropIfExists('users');
+        return $this->belongsTo(Company::class);
     }
-};
+}

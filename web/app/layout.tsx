@@ -1,57 +1,31 @@
-import type { Metadata } from "next"
-import { Inter, Fraunces } from "next/font/google"
-import "./globals.css"
-
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { Toaster } from "react-hot-toast"
-
-import Providers from "@/components/Providers"
-import Navbar from "@/components/layout/NavBar"
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: "Tubo",
-  description: "",
-}
+  title: 'Tubo — Invoice Management',
+  description: 'Electronic invoice management for Philippine businesses.',
+  authors: [{ name: 'Tubo Technologies Inc.' }],
+  icons: { icon: [{ url: '/favicon.ico', type: 'image/x-icon' }] },
+  openGraph: { type: 'website' },
+  twitter: { card: 'summary_large_image' },
+};
 
-const inter = Inter({
-  variable: "--font-body",
-  subsets: ["latin"],
-})
-
-const fraunces = Fraunces({
-  variable: "--font-heading",
-  subsets: ["latin"],
-})
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${fraunces.variable}`}>
-        <Providers>
-          <Navbar />
-
-          <TooltipProvider>{children}</TooltipProvider>
-
-          <Footer />
-
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              style: {
-                borderRadius: "9999px",
-                background: "#25eb36",
-                color: "#FAF9F6",
-                padding: "10px 18px",
-                fontSize: "14px",
-              },
-            }}
-          />
-        </Providers>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700&display=swap"
+        />
+      </head>
+      <body>
+        <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }

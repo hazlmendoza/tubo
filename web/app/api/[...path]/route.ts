@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const LARAVEL_API_URL = process.env.LARAVEL_API_URL!
+const API_BASE = process.env.API_BASE!
 
 async function handler(request: NextRequest) {
   // Remove /api from the Next.js request path.
   const path = request.nextUrl.pathname.replace(/^\/api/, "")
   const search = request.nextUrl.search
 
-  const url = `${LARAVEL_API_URL}/api${path}${search}`
+  const url = `${API_BASE}/api${path}${search}`
 
   const headers = new Headers(request.headers)
 

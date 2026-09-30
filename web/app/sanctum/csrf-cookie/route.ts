@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const LARAVEL_API_URL = process.env.LARAVEL_API_URL!
+const API_BASE = process.env.API_BASE!
 
 export async function GET(request: NextRequest) {
     try {
         const response = await fetch(
-            `${LARAVEL_API_URL}/sanctum/csrf-cookie`,
+            `${API_BASE}/sanctum/csrf-cookie`,
             {
                 method: "GET",
                 headers: {
