@@ -7,7 +7,9 @@ import {
     ChevronLeft,
     ChevronRight,
     FileSearch,
+    Pencil,
     RefreshCw,
+    Trash2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -130,7 +132,7 @@ export function PageHeading({
             </div>
 
             {action && (
-                <div className="flex gap-2 [&>*]:w-full sm:[&>*]:w-auto">
+                <div className="flex shrink-0 items-center gap-2">
                     {action}
                 </div>
             )}
@@ -267,9 +269,11 @@ export function StatCard({
 export function InvoiceTable({
     invoices,
     showCreated = true,
+    onDelete,
 }: {
     invoices: Invoice[]
     showCreated?: boolean
+    onDelete?: (invoice: Invoice) => void
 }) {
     return (
         <div className="overflow-x-auto">
@@ -292,15 +296,30 @@ export function InvoiceTable({
                             CURRENCY
                         </th>
 
-                        <th className={cn(thBase, "text-right")}>
+                        <th
+                            className={cn(
+                                thBase,
+                                "text-right"
+                            )}
+                        >
                             SUBTOTAL
                         </th>
 
-                        <th className={cn(thBase, "text-right")}>
+                        <th
+                            className={cn(
+                                thBase,
+                                "text-right"
+                            )}
+                        >
                             TAX
                         </th>
 
-                        <th className={cn(thBase, "text-right")}>
+                        <th
+                            className={cn(
+                                thBase,
+                                "text-right"
+                            )}
+                        >
                             TOTAL
                         </th>
 
@@ -314,7 +333,12 @@ export function InvoiceTable({
                             </th>
                         )}
 
-                        <th className={cn(thBase, "text-right")}>
+                        <th
+                            className={cn(
+                                thBase,
+                                "text-right"
+                            )}
+                        >
                             ACTIONS
                         </th>
                     </tr>
@@ -340,12 +364,16 @@ export function InvoiceTable({
                             <td className={tdBase}>
                                 <div>
                                     <p className="font-medium text-foreground">
-                                        {invoice.customer_name}
+                                        {
+                                            invoice.customer_name
+                                        }
                                     </p>
 
                                     {invoice.customer_email && (
                                         <p className="mt-0.5 text-xs text-muted-foreground">
-                                            {invoice.customer_email}
+                                            {
+                                                invoice.customer_email
+                                            }
                                         </p>
                                     )}
                                 </div>
@@ -353,13 +381,17 @@ export function InvoiceTable({
 
                             {/* Invoice date */}
                             <td className={tdBase}>
-                                {date(invoice.invoice_date)}
+                                {date(
+                                    invoice.invoice_date
+                                )}
                             </td>
 
                             {/* Currency */}
                             <td className={tdBase}>
                                 <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
-                                    {invoice.currency}
+                                    {
+                                        invoice.currency
+                                    }
                                 </span>
                             </td>
 
@@ -405,20 +437,25 @@ export function InvoiceTable({
                             {/* Status */}
                             <td className={tdBase}>
                                 <StatusBadge
-                                    status={invoice.status}
+                                    status={
+                                        invoice.status
+                                    }
                                 />
                             </td>
 
                             {/* Created */}
                             {showCreated && (
                                 <td className={tdBase}>
-                                    {date(invoice.created_at)}
+                                    {date(
+                                        invoice.created_at
+                                    )}
                                 </td>
                             )}
 
                             {/* Actions */}
                             <td className={tdBase}>
-                                <div className="flex justify-end">
+                                <div className="flex justify-end gap-1">
+                                    {/* View */}
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -431,6 +468,34 @@ export function InvoiceTable({
                                         >
                                             <ArrowRight size={16} />
                                         </Link>
+                                    </Button>
+
+                                    {/* Edit */}
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        asChild
+                                        title={`Edit ${invoice.invoice_number}`}
+                                    >
+                                        <Link
+                                            href={`/invoices/${invoice.id}/edit`}
+                                            aria-label={`Edit ${invoice.invoice_number}`}
+                                        >
+                                            <Pencil size={16} />
+                                        </Link>
+                                    </Button>
+
+                                    {/* Delete */}
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        type="button"
+                                        title={`Delete ${invoice.invoice_number}`}
+                                        aria-label={`Delete ${invoice.invoice_number}`}
+                                        onClick={() => onDelete?.(invoice)}
+                                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    >
+                                        <Trash2 size={16} />
                                     </Button>
                                 </div>
                             </td>

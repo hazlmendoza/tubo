@@ -9,17 +9,15 @@ class ProcessingLog extends Model
 {
     protected $fillable = [
         'invoice_id',
-        'attempt_number',
-        'started_at',
-        'completed_at',
-        'http_status',
         'status',
-        'error_message',
+        'message',
+        'http_status',
+        'retryable',
+        'external_reference',
     ];
 
     protected $casts = [
-        'started_at' => 'datetime',
-        'completed_at' => 'datetime',
+        'retryable' => 'boolean',
     ];
 
     public function invoice(): BelongsTo

@@ -1,66 +1,70 @@
 import { apiFetch } from "@/lib/api"
 import type {
-    Invoice,
     CreateInvoiceInput,
+    Invoice,
+    ProcessingLog,
 } from "@/types/invoice"
 
+export interface InvoiceListResponse {
+    invoices: Invoice[]
+}
+
+export interface ProcessingLogsResponse {
+    processing_logs: ProcessingLog[]
+}
+
 export const invoiceService = {
-    /**
-     * Get all invoices for the authenticated company.
-     */
-    async getInvoices(): Promise<Invoice[]> {
-        const response = await apiFetch("/invoices")
-
-        return response.invoices
+    async getInvoices(): Promise<InvoiceListResponse> {
+        return apiFetch<InvoiceListResponse>("/invoices")
     },
 
-    /**
-     * Get a single invoice by ID.
-     */
-    async getInvoices(): Promise<Invoice[]> {
-        const response = await apiFetch("/invoices")
-
-        return response.invoices
+    async getInvoice(id: string | number): Promise<Invoice> {
+        return apiFetch<Invoice>(`/invoices/${id}`)
     },
 
-    /**
-     * Create a new invoice.
-     *
-     * Invoice number, subtotal, tax amount,
-     * and total amount are generated/calculated by Laravel.
-     */
+    async getProcessingLogs(
+        id: string | number
+    ): Promise<ProcessingLogsResponse> {
+        return apiFetch<ProcessingLogsResponse>(
+            `/invoices/${id}/processing-logs`
+        )
+    },
+
     async createInvoice(
-        input: CreateInvoiceInput
+        data: CreateInvoiceInput
     ): Promise<Invoice> {
-        const response = await apiFetch("/invoices", {
+        return apiFetch<Invoice>("/invoices", {
             method: "POST",
-            body: JSON.stringify(input),
+            body: JSON.stringify(data),
         })
-
-        return response.invoice
     },
 
-    /**
-     * Update an existing invoice.
-     */
     async updateInvoice(
-        id: string,
-        input: Partial<CreateInvoiceInput>
+        id: string | number,
+        data: Partial<CreateInvoiceInput>
     ): Promise<Invoice> {
-        const response = await apiFetch(`/invoices/${id}`, {
+        return apiFetch<Invoice>(`/invoices/${id}`, {
             method: "PUT",
-            body: JSON.stringify(input),
+            body: JSON.stringify(data),
         })
-
-        return response.invoice
     },
 
-    /**
-     * Delete an invoice.
-     */
-    async deleteInvoice(id: string): Promise<void> {
+    async deleteInvoice(
+        id: string | number
+    ): Promise<void> {
         await apiFetch(`/invoices/${id}`, {
             method: "DELETE",
         })
+    },
+
+    async retryInvoice(
+        id: string | number
+    ): Promise<Invoice> {
+        return apiFetch<Invoice>(
+            `/invoices/${id}/retry`,
+            {
+                method: "POST",
+            }
+        )
     },
 }

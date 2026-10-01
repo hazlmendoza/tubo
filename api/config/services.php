@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    'government_api' => [
+        'url' => env(
+            'GOVERNMENT_API_URL',
+            'http://127.0.0.1:8001/api/government-api'
+        ),
+
+        'scenario' => env(
+            'GOVERNMENT_API_SCENARIO',
+            'success'
+        ),
+    ],
+
 ];

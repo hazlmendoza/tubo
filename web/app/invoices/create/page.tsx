@@ -18,16 +18,25 @@ export default function CreateInvoicePage() {
         try {
             const response = await createInvoice(data)
 
-            toast.success(response.message)
-
-            router.push(
-                `/invoices`
+            /*
+             * The backend returns HTTP 202 Accepted.
+             *
+             * This means Tubo successfully created the invoice
+             * and queued it for background processing.
+             *
+             * Government submission happens asynchronously.
+             */
+            toast.success(
+                response.message ||
+                    "Invoice accepted for processing."
             )
+
+            router.push("/invoices")
         } catch (error) {
-            console.error(error)
+            console.error("Create invoice error:", error)
 
             toast.error(
-                "Failed to create invoice. Please check your information."
+                "Failed to create invoice. Please check your information and try again."
             )
         }
     }
@@ -36,8 +45,8 @@ export default function CreateInvoicePage() {
         <div className="mx-auto max-w-5xl space-y-6">
             <div>
                 <Link
-                    href="/dashboard/invoices"
-                    className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                    href="/invoices"
+                    className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Back to invoices

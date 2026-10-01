@@ -16,8 +16,24 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 import { invoiceService } from "@/services/invoiceService"
-import type { Invoice, InvoiceStatus } from "@/types/invoice"
+
+import type {
+    Invoice,
+    InvoiceStatus,
+} from "@/types/invoice"
 
 import {
     EmptyState,
@@ -44,19 +60,27 @@ export default function InvoiceListPage({
 
     const [query, setQuery] = useState("")
     const [number, setNumber] = useState("")
-    const [status, setStatus] = useState<"ALL" | InvoiceStatus>("ALL")
+    const [status, setStatus] =
+        useState<"ALL" | InvoiceStatus>("ALL")
     const [filterDate, setFilterDate] = useState("")
 
     const [page, setPage] = useState(1)
+
+    // Delete state
+    const [deleteInvoice, setDeleteInvoice] =
+        useState<Invoice | null>(null)
+
+    const [deleting, setDeleting] = useState(false)
 
     async function load() {
         setLoading(true)
         setError("")
 
         try {
-            const result = await invoiceService.getInvoices()
+            const result =
+                await invoiceService.getInvoices()
 
-            setInvoices(result)
+            setInvoices(result.invoices)
         } catch (error) {
             setError(
                 error instanceof Error
@@ -78,19 +102,23 @@ export default function InvoiceListPage({
             ALL: invoices.length,
 
             PENDING: invoices.filter(
-                (invoice) => invoice.status === "PENDING"
+                (invoice) =>
+                    invoice.status === "PENDING"
             ).length,
 
             PROCESSING: invoices.filter(
-                (invoice) => invoice.status === "PROCESSING"
+                (invoice) =>
+                    invoice.status === "PROCESSING"
             ).length,
 
             SUBMITTED: invoices.filter(
-                (invoice) => invoice.status === "SUBMITTED"
+                (invoice) =>
+                    invoice.status === "SUBMITTED"
             ).length,
 
             FAILED: invoices.filter(
-                (invoice) => invoice.status === "FAILED"
+                (invoice) =>
+                    invoice.status === "FAILED"
             ).length,
         }),
         [invoices]
@@ -105,7 +133,8 @@ export default function InvoiceListPage({
 
             const matchesDate =
                 !filterDate ||
-                invoice.invoice_date.slice(0, 10) === filterDate
+                invoice.invoice_date.slice(0, 10) ===
+                filterDate
 
             const matchesNumber =
                 !number ||
@@ -154,6 +183,61 @@ export default function InvoiceListPage({
         setPage(1)
     }
 
+    function openDeleteModal(invoice: Invoice) {
+        setDeleteInvoice(invoice)
+    }
+
+    async function handleDeleteInvoice() {
+        if (!deleteInvoice) return
+
+        setDeleting(true)
+
+        try {
+            await invoiceService.deleteInvoice(
+                deleteInvoice.id
+            )
+
+            setInvoices((current) =>
+                current.filter(
+                    (invoice) =>
+                        invoice.id !== deleteInvoice.id
+                )
+            )
+
+            toast.success(
+                "Invoice deleted successfully."
+            )
+
+            setDeleteInvoice(null)
+
+            // Keep the user on a valid page
+            const remainingCount =
+                filtered.length - 1
+
+            const remainingPages = Math.max(
+                1,
+                Math.ceil(
+                    remainingCount / PAGE_SIZE
+                )
+            )
+
+            setPage((currentPage) =>
+                Math.min(
+                    currentPage,
+                    remainingPages
+                )
+            )
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to delete invoice."
+            )
+        } finally {
+            setDeleting(false)
+        }
+    }
+
     return (
         <div className="mx-auto w-full max-w-[1510px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             <PageHeading
@@ -173,10 +257,17 @@ export default function InvoiceListPage({
                         : "View, track, and manage every invoice in one place."
                 }
                 action={
-                    <Button asChild>
-                        <Link href="/invoices/create">
-                            <Plus size={16} />
-                            Create Invoice
+                    <Button
+                        asChild
+                        size="sm"
+                        className="shrink-0 whitespace-nowrap"
+                    >
+                        <Link
+                            href="/invoices/create"
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="size-4 shrink-0" />
+                            <span>Create Invoice</span>
                         </Link>
                     </Button>
                 }
@@ -188,35 +279,47 @@ export default function InvoiceListPage({
                     <StatCard
                         label="Total Invoices"
                         value={counts.ALL}
-                        icon={<FileText size={18} />}
+                        icon={
+                            <FileText size={18} />
+                        }
                     />
 
                     <StatCard
                         label="Pending"
                         value={counts.PENDING}
                         status="PENDING"
-                        icon={<Clock3 size={18} />}
+                        icon={
+                            <Clock3 size={18} />
+                        }
                     />
 
                     <StatCard
                         label="Processing"
                         value={counts.PROCESSING}
                         status="PROCESSING"
-                        icon={<Timer size={18} />}
+                        icon={
+                            <Timer size={18} />
+                        }
                     />
 
                     <StatCard
                         label="Submitted"
                         value={counts.SUBMITTED}
                         status="SUBMITTED"
-                        icon={<Send size={18} />}
+                        icon={
+                            <Send size={18} />
+                        }
                     />
 
                     <StatCard
                         label="Failed"
                         value={counts.FAILED}
                         status="FAILED"
-                        icon={<AlertCircle size={18} />}
+                        icon={
+                            <AlertCircle
+                                size={18}
+                            />
+                        }
                     />
                 </div>
             )}
@@ -243,6 +346,7 @@ export default function InvoiceListPage({
                             variant="outline"
                             size="sm"
                             asChild
+                            className="shrink-0 whitespace-nowrap"
                         >
                             <Link href="/invoices">
                                 View all invoices
@@ -266,7 +370,9 @@ export default function InvoiceListPage({
                             placeholder="Search invoice or customer..."
                             value={query}
                             onChange={(event) => {
-                                setQuery(event.target.value)
+                                setQuery(
+                                    event.target.value
+                                )
                                 setPage(1)
                             }}
                         />
@@ -279,7 +385,9 @@ export default function InvoiceListPage({
                         placeholder="Invoice number"
                         value={number}
                         onChange={(event) => {
-                            setNumber(event.target.value)
+                            setNumber(
+                                event.target.value
+                            )
                             setPage(1)
                         }}
                     />
@@ -291,11 +399,11 @@ export default function InvoiceListPage({
                         value={status}
                         onChange={(event) => {
                             setStatus(
-                                event.target.value as
+                                event.target
+                                    .value as
                                 | "ALL"
                                 | InvoiceStatus
                             )
-
                             setPage(1)
                         }}
                     >
@@ -310,19 +418,29 @@ export default function InvoiceListPage({
                                 "SUBMITTED",
                                 "FAILED",
                             ] as InvoiceStatus[]
-                        ).map((invoiceStatus) => (
-                            <option
-                                key={invoiceStatus}
-                                value={invoiceStatus}
-                            >
-                                {invoiceStatus
-                                    .charAt(0)
-                                    .toUpperCase() +
-                                    invoiceStatus
-                                        .slice(1)
-                                        .toLowerCase()}
-                            </option>
-                        ))}
+                        ).map(
+                            (invoiceStatus) => (
+                                <option
+                                    key={
+                                        invoiceStatus
+                                    }
+                                    value={
+                                        invoiceStatus
+                                    }
+                                >
+                                    {invoiceStatus
+                                        .charAt(
+                                            0
+                                        )
+                                        .toUpperCase() +
+                                        invoiceStatus
+                                            .slice(
+                                                1
+                                            )
+                                            .toLowerCase()}
+                                </option>
+                            )
+                        )}
                     </select>
 
                     {/* Date */}
@@ -332,7 +450,9 @@ export default function InvoiceListPage({
                         type="date"
                         value={filterDate}
                         onChange={(event) => {
-                            setFilterDate(event.target.value)
+                            setFilterDate(
+                                event.target.value
+                            )
                             setPage(1)
                         }}
                     />
@@ -341,7 +461,7 @@ export default function InvoiceListPage({
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="justify-self-start sm:col-span-2 lg:col-span-1"
+                        className="justify-self-start whitespace-nowrap sm:col-span-2 lg:col-span-1"
                         onClick={clearFilters}
                         disabled={
                             !query &&
@@ -351,7 +471,7 @@ export default function InvoiceListPage({
                         }
                     >
                         <X size={15} />
-                        Clear
+                        <span>Clear</span>
                     </Button>
                 </div>
 
@@ -366,8 +486,13 @@ export default function InvoiceListPage({
                 ) : paginatedInvoices.length > 0 ? (
                     <>
                         <InvoiceTable
-                            invoices={paginatedInvoices}
+                            invoices={
+                                paginatedInvoices
+                            }
                             showCreated={!dashboard}
+                            onDelete={
+                                openDeleteModal
+                            }
                         />
 
                         <Pagination
@@ -382,6 +507,57 @@ export default function InvoiceListPage({
                     <EmptyState />
                 )}
             </section>
+
+            {/* Delete confirmation modal */}
+            <AlertDialog
+                open={!!deleteInvoice}
+                onOpenChange={(open) => {
+                    if (!open && !deleting) {
+                        setDeleteInvoice(null)
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Delete invoice?
+                        </AlertDialogTitle>
+
+                        <AlertDialogDescription>
+                            Are you sure you want to
+                            delete{" "}
+                            <span className="font-medium text-foreground">
+                                {
+                                    deleteInvoice?.invoice_number
+                                }
+                            </span>
+                            ? This action cannot be
+                            undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            disabled={deleting}
+                        >
+                            Cancel
+                        </AlertDialogCancel>
+
+                        <AlertDialogAction
+                            disabled={deleting}
+                            onClick={(event) => {
+                                event.preventDefault()
+                                void handleDeleteInvoice()
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {deleting
+                                ? "Deleting..."
+                                : "Delete Invoice"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

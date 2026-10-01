@@ -13,10 +13,25 @@ class ProcessingLogController extends Controller
             abort(404);
         }
 
-        return response()->json(
-            $invoice->processingLogs()
-                ->orderBy('attempt_number')
-                ->get()
-        );
+        return response()->json([
+            'processing_logs' => $invoice->processingLogs()
+                ->latest()
+                ->get(),
+        ]);
+    }
+
+    public function show(
+        Request $request,
+        Invoice $invoice,
+        int $processingLog
+    ) {
+        if ($invoice->company_id !== $request->user()->company_id) {
+            abort(404);
+        }
+
+        $log = $invoice->processingLogs()
+            ->findOrFail($processingLog);
+
+        return response()->json($log);
     }
 }

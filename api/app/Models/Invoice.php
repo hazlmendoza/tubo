@@ -22,6 +22,7 @@ class Invoice extends Model
         'total_amount',
         'status',
         'idempotency_key',
+        'external_idempotency_key',
     ];
 
     protected $casts = [

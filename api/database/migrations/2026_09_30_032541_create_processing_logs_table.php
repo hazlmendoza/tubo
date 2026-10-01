@@ -15,23 +15,19 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
-            $table->unsignedInteger('attempt_number');
-
-            $table->timestamp('started_at');
-            $table->timestamp('completed_at')->nullable();
-
-            $table->unsignedSmallInteger('http_status')->nullable();
-
             $table->string('status');
+            $table->text('message')->nullable();
 
-            $table->text('error_message')->nullable();
+            $table->unsignedSmallInteger('http_status')
+                ->nullable();
+
+            $table->boolean('retryable')
+                ->default(false);
+
+            $table->string('external_reference')
+                ->nullable();
 
             $table->timestamps();
-
-            $table->index([
-                'invoice_id',
-                'attempt_number',
-            ]);
         });
     }
 

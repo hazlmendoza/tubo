@@ -124,10 +124,18 @@ export default function InvoiceDetail({ params }: PageProps) {
                     invoice.created_at
                 )} · ${invoice.customer_name}`}
                 action={
-                    <Button variant="outline" asChild>
-                        <Link href="/invoices">
-                            <ArrowLeft size={16} />
-                            Back to Invoices
+                    <Button
+                        variant="outline"
+                        asChild
+                        size="sm"
+                        className="h-9 w-auto shrink-0 whitespace-nowrap px-3"
+                    >
+                        <Link
+                            href="/invoices"
+                            className="flex items-center gap-2"
+                        >
+                            <ArrowLeft className="size-4 shrink-0" />
+                            <span>Back to Invoices</span>
                         </Link>
                     </Button>
                 }
@@ -326,7 +334,9 @@ export default function InvoiceDetail({ params }: PageProps) {
 
                         <div className="item-summary">
                             <InvoiceSummary
-                                {...invoice}
+                                subtotal={Number(invoice.subtotal)}
+                                taxAmount={Number(invoice.tax_amount)}
+                                totalAmount={Number(invoice.total_amount)}
                                 currency={invoice.currency}
                             />
                         </div>
@@ -359,11 +369,11 @@ export default function InvoiceDetail({ params }: PageProps) {
                             <div className="timeline-entry">
                                 <span
                                     className={`timeline-marker ${invoice.status === "FAILED"
-                                            ? "failed"
-                                            : invoice.status ===
-                                                "SUBMITTED"
-                                                ? "complete"
-                                                : ""
+                                        ? "failed"
+                                        : invoice.status ===
+                                            "SUBMITTED"
+                                            ? "complete"
+                                            : ""
                                         }`}
                                 >
                                     <Circle size={13} />
