@@ -1,0 +1,1078 @@
+# TUBO – Full-Stack Developer Technical Assessment
+
+
+
+## 1. Project Overview
+
+Tubo is a multi-tenant electronic invoicing application designed for businesses to create, manage, validate, and process invoices.
+
+The application consists of:
+
+* A **Next.js frontend** for the user interface
+* A **Laravel REST API** for business logic and authentication
+* A **MySQL database** for persistent data
+* **Laravel Sanctum SPA authentication** for browser-based authentication
+* An invoice-processing architecture designed to support asynchronous submission to an external government invoicing service
+
+The implementation prioritizes the assessment's requirements in the following order:
+
+> **Correctness → Data Integrity → Backend Design → Reliability → Security → Maintainability → UI**
+
+The goal was not to build every possible production feature, but to implement the core functionality correctly and clearly document how the application would evolve into a production-grade system.
+
+---
+
+# 2. Technology Stack
+
+| Layer              | Technology                                   |
+| ------------------ | -------------------------------------------- |
+| Frontend           | Next.js / React                              |
+| Language           | TypeScript                                   |
+| Backend            | Laravel / PHP                                |
+| Database           | MySQL                                        |
+| Authentication     | Laravel Sanctum SPA / Session Authentication |
+| API                | REST                                         |
+| Styling            | Tailwind CSS                                 |
+| Icons              | Lucide React                                 |
+| Package Management | npm / Composer                               |
+| Version Control    | Git / GitHub                                 |
+
+---
+
+# 3. Application Architecture
+
+The application follows a client/API/database architecture.
+
+```text
+┌────────────────────────────┐
+│          Browser           │
+│      Next.js / React       │
+└─────────────┬──────────────┘
+              │
+              │ HTTP / JSON
+              │ Session Cookie
+              ▼
+┌────────────────────────────┐
+│       Laravel API          │
+│                            │
+│ Authentication             │
+│ Authorization              │
+│ Validation                 │
+│ Invoice Business Logic     │
+│ Error Handling             │
+└─────────────┬──────────────┘
+              │
+              ▼
+┌────────────────────────────┐
+│           MySQL            │
+│                            │
+│ Companies                  │
+│ Users                      │
+│ Invoices                   │
+│ Invoice Items              │
+│ Processing Logs            │
+└─────────────┬──────────────┘
+              │
+              │ Async Processing
+              ▼
+┌────────────────────────────┐
+│       Queue / Worker       │
+│     Invoice Processor      │
+└─────────────┬──────────────┘
+              │
+              ▼
+┌────────────────────────────┐
+│ Government Invoice API     │
+│                            │
+│ 200 Success                │
+│ 400 Invalid Invoice        │
+│ 503 Temporary Failure      │
+│ Timeout                    │
+└────────────────────────────┘
+```
+
+The most important architectural distinction is:
+
+> **Accepting an invoice into Tubo is different from successfully submitting it to the external government service.**
+
+Tubo should first safely persist the invoice. External processing should happen separately.
+
+---
+
+# 4. Multi-Tenant Architecture
+
+Tubo is designed as a multi-company application.
+
+Each business has its own company record, users, and invoices.
+
+```text
+Company
+│
+├── Users
+│
+└── Invoices
+    │
+    ├── Invoice Items
+    │
+    └── Processing Logs
+```
+
+For example:
+
+```text
+Company A
+├── User A
+├── Invoice A-001
+└── Invoice A-002
+
+Company B
+├── User B
+├── Invoice B-001
+└── Invoice B-002
+```
+
+The authenticated user's `company_id` determines which tenant they belong to.
+
+The frontend does **not** control which company an invoice belongs to.
+
+Instead, the backend derives the company from the authenticated user.
+
+This is important because a malicious user should not be able to submit:
+
+```json
+{
+    "company_id": 2
+}
+```
+
+and create an invoice under another company.
+
+---
+
+# 5. Database Design
+
+The core database entities are:
+
+```text
+companies
+users
+invoices
+invoice_items
+processing_logs
+```
+
+## 5.1 Companies
+
+Stores business information.
+
+Example:
+
+```text
+id
+name
+tax_id
+created_at
+updated_at
+```
+
+Relationship:
+
+```text
+Company hasMany Users
+Company hasMany Invoices
+```
+
+---
+
+## 5.2 Users
+
+Stores authenticated application users.
+
+Example:
+
+```text
+id
+company_id
+name
+email
+password
+role
+created_at
+updated_at
+```
+
+Relationship:
+
+```text
+User belongsTo Company
+```
+
+The `role` field can represent permissions such as:
+
+```text
+owner
+staff
+admin
+```
+
+---
+
+## 5.3 Invoices
+
+Stores invoice header information.
+
+Example:
+
+```text
+id
+company_id
+invoice_number
+invoice_date
+seller_name
+customer_name
+customer_tax_id
+customer_email
+currency
+subtotal
+tax_amount
+total_amount
+status
+external_reference
+created_at
+updated_at
+```
+
+Relationship:
+
+```text
+Invoice belongsTo Company
+Invoice hasMany InvoiceItems
+Invoice hasMany ProcessingLogs
+```
+
+---
+
+## 5.4 Invoice Items
+
+Stores individual invoice lines.
+
+Example:
+
+```text
+id
+invoice_id
+description
+quantity
+unit_price
+tax
+line_total
+created_at
+updated_at
+```
+
+Relationship:
+
+```text
+InvoiceItem belongsTo Invoice
+```
+
+One invoice can therefore contain multiple items.
+
+---
+
+## 5.5 Processing Logs
+
+Stores the history of external processing attempts.
+
+Example:
+
+```text
+id
+invoice_id
+attempt_number
+status
+started_at
+ended_at
+http_status
+response_body
+error_message
+created_at
+updated_at
+```
+
+The purpose of this table is to avoid losing historical processing information.
+
+For example:
+
+```text
+Invoice INV-20001
+
+Attempt 1 → 503
+Attempt 2 → Timeout
+Attempt 3 → 503
+Attempt 4 → 200
+```
+
+All attempts should remain available for investigation.
+
+---
+
+# 6. Why a Relational Database?
+
+A relational database is appropriate because invoice data contains strong relationships and integrity requirements.
+
+The relationships are:
+
+```text
+Company 1 ──── * Users
+
+Company 1 ──── * Invoices
+
+Invoice 1 ──── * Invoice Items
+
+Invoice 1 ──── * Processing Logs
+```
+
+Foreign keys protect referential integrity.
+
+Transactions can also be used to ensure that related records are created atomically.
+
+For example:
+
+```text
+BEGIN TRANSACTION
+
+Create Invoice
+Create Invoice Items
+
+COMMIT
+```
+
+If an operation fails, the transaction can roll back.
+
+This prevents partially-created invoices.
+
+---
+
+# 7. Duplicate Invoice Prevention
+
+One of the important requirements is preventing duplicate invoices.
+
+The business rule is:
+
+> A company cannot have two invoices with the same invoice number.
+
+The database should therefore have a unique constraint:
+
+```text
+UNIQUE(company_id, invoice_number)
+```
+
+This is more reliable than only performing an application-level check.
+
+---
+
+# 8. Why Application-Level Validation Alone Is Not Enough
+
+Consider:
+
+```javascript
+const existingInvoice = await Invoice.findOne({
+    companyId,
+    invoiceNumber
+});
+
+if (!existingInvoice) {
+    await Invoice.create({
+        companyId,
+        invoiceNumber,
+        total
+    });
+}
+```
+
+This looks correct but is not concurrency-safe.
+
+Two requests could arrive at almost exactly the same time.
+
+```text
+Request A:
+SELECT invoice
+→ Nothing found
+
+Request B:
+SELECT invoice
+→ Nothing found
+
+Request A:
+INSERT invoice
+
+Request B:
+INSERT invoice
+```
+
+Both requests passed the existence check.
+
+This is a race condition.
+
+Therefore:
+
+> Application validation provides a friendly check, but the database unique constraint provides the final integrity guarantee.
+
+---
+
+# 9. Concurrent Duplicate Requests
+
+Suppose two requests arrive simultaneously:
+
+```text
+Company: ABC Corporation
+Invoice Number: INV-10001
+```
+
+Both requests may initially determine that the invoice does not exist.
+
+However, the database constraint:
+
+```text
+UNIQUE(company_id, invoice_number)
+```
+
+allows only one insert to succeed.
+
+The second request receives a database uniqueness violation.
+
+The API should translate that into an appropriate response such as:
+
+```http
+409 Conflict
+```
+
+Example:
+
+```json
+{
+    "message": "An invoice with this invoice number already exists."
+}
+```
+
+This protects the system even when multiple API servers are running.
+
+---
+
+# 10. API Endpoints
+
+## Authentication
+
+```http
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/user
+POST /api/auth/logout
+```
+
+## Invoice API
+
+```http
+POST /api/invoices
+GET  /api/invoices
+GET  /api/invoices/{id}
+POST /api/invoices/{id}/retry
+```
+
+---
+
+# 11. Create Invoice
+
+```http
+POST /api/invoices
+```
+
+The endpoint should perform the following steps:
+
+1. Authenticate the requester.
+2. Determine the company from the authenticated user.
+3. Validate the invoice.
+4. Validate invoice items.
+5. Calculate/validate totals.
+6. Check duplicate invoice numbers.
+7. Create the invoice.
+8. Create invoice items.
+9. Queue processing.
+10. Return the created invoice.
+
+The client should not provide the authoritative `company_id`.
+
+Instead:
+
+```text
+Authenticated User
+        ↓
+User.company_id
+        ↓
+Invoice.company_id
+```
+
+This protects tenant isolation.
+
+---
+
+# 12. Invoice Validation
+
+The backend validates fields such as:
+
+```text
+invoice_number
+invoice_date
+customer_name
+customer_tax_id
+customer_email
+currency
+items
+quantity
+unit_price
+tax
+```
+
+The backend should also validate business rules.
+
+For example:
+
+```text
+quantity > 0
+unit_price >= 0
+items must not be empty
+```
+
+---
+
+# 13. Server-Side Totals
+
+The frontend may calculate totals for display, but the backend should remain authoritative.
+
+For example:
+
+```text
+Line Total = Quantity × Unit Price + Tax
+```
+
+Then:
+
+```text
+Subtotal = sum of item subtotals
+
+Tax Amount = sum of item taxes
+
+Total = Subtotal + Tax Amount
+```
+
+The server should not blindly trust totals supplied by the browser.
+
+This prevents a client from submitting manipulated values.
+
+---
+
+# 14. Database Transactions
+
+Creating an invoice involves multiple database records.
+
+For example:
+
+```text
+Invoice
+├── Item 1
+├── Item 2
+└── Item 3
+```
+
+These operations should be performed within a database transaction.
+
+Conceptually:
+
+```php
+DB::transaction(function () {
+    $invoice = Invoice::create(...);
+
+    $invoice->items()->createMany(...);
+});
+```
+
+If one item cannot be created, the invoice creation should roll back.
+
+This prevents incomplete invoice records.
+
+---
+
+# 15. Invoice Statuses
+
+The proposed lifecycle is:
+
+```text
+PENDING
+   │
+   ▼
+PROCESSING
+   │
+   ├──────────► SUBMITTED
+   │
+   └──────────► FAILED
+                    │
+                    ▼
+                  RETRY
+                    │
+                    ▼
+                PROCESSING
+```
+
+## PENDING
+
+The invoice has been successfully stored but has not yet been processed.
+
+## PROCESSING
+
+A worker is currently attempting external submission.
+
+## SUBMITTED
+
+The external service successfully accepted the invoice.
+
+## FAILED
+
+The processing attempt failed.
+
+A failed invoice may be retryable or permanently invalid depending on the error.
+
+---
+
+# 16. Authentication
+
+The application uses Laravel Sanctum's SPA authentication model.
+
+Authentication is session-based rather than storing JWT tokens in localStorage.
+
+The general flow is:
+
+```text
+Browser
+   │
+   ├── CSRF Cookie
+   │
+   └── Session Cookie
+           │
+           ▼
+       Laravel
+```
+
+The frontend sends authenticated requests using:
+
+```text
+credentials: "include"
+```
+
+This allows the browser to send the Laravel session cookie with requests.
+
+---
+
+# 17. Login Flow
+
+The login flow is:
+
+```text
+1. User submits email/password
+2. Laravel validates credentials
+3. Laravel authenticates the user
+4. Session ID is regenerated
+5. Browser receives/retains session cookie
+6. Frontend stores authenticated user state
+```
+
+Session regeneration is important because it helps prevent session fixation.
+
+---
+
+# 18. Logout Flow
+
+Logout performs:
+
+```text
+1. Laravel logs out the user
+2. Session is invalidated
+3. Session token is regenerated
+4. Frontend clears authenticated user state
+```
+
+This ensures that the previous session cannot continue to be used.
+
+---
+
+# 19. CSRF Protection
+
+Because the application uses cookie-based session authentication, CSRF protection is required for state-changing requests.
+
+The Sanctum endpoint is:
+
+```http
+GET /sanctum/csrf-cookie
+```
+
+Important:
+
+```text
+Correct:
+http://localhost:8000/sanctum/csrf-cookie
+```
+
+Not:
+
+```text
+http://localhost:8000/api/sanctum/csrf-cookie
+```
+
+The `/sanctum/csrf-cookie` route is outside the `/api` prefix.
+
+The frontend API client initializes the CSRF cookie before state-changing requests.
+
+---
+
+# 20. Cross-Company Data Protection
+
+Authentication alone is not enough.
+
+For example:
+
+```text
+User A
+Company A
+```
+
+should not be able to access:
+
+```text
+Invoice 500
+Company B
+```
+
+even if User A manually changes the URL:
+
+```text
+/api/invoices/500
+```
+
+The backend should query invoices using both:
+
+```text
+invoice ID
+```
+
+and:
+
+```text
+authenticated user's company_id
+```
+
+Conceptually:
+
+```php
+Invoice::where('id', $id)
+    ->where('company_id', $request->user()->company_id)
+    ->firstOrFail();
+```
+
+This means an invoice from another company is never returned.
+
+The same tenant condition must be applied to:
+
+* list;
+* get;
+* update;
+* delete;
+* retry;
+* processing operations.
+
+---
+
+# 21. Security Checks
+
+Before accepting an invoice request, the backend should perform:
+
+### Authentication
+
+Verify that the user is authenticated.
+
+### Authorization
+
+Verify that the user has permission to perform the operation.
+
+### Tenant Isolation
+
+Use the authenticated user's company rather than trusting a company ID from the client.
+
+### Validation
+
+Validate:
+
+* required fields;
+* data types;
+* string lengths;
+* email;
+* dates;
+* quantities;
+* prices;
+* invoice items.
+
+### Duplicate Detection
+
+Check invoice number uniqueness.
+
+### Database Constraint
+
+Enforce:
+
+```text
+UNIQUE(company_id, invoice_number)
+```
+
+### CSRF
+
+Protect browser-based state-changing requests.
+
+### Rate Limiting
+
+Protect sensitive endpoints from abuse.
+
+### Mass Assignment Protection
+
+Use Laravel `$fillable` or `$guarded` appropriately.
+
+### SQL Injection Protection
+
+Use Eloquent/query builder and parameterized queries rather than concatenating user input into SQL.
+
+---
+
+# 22. Secrets and Credentials
+
+Sensitive information should never be committed to Git.
+
+Examples:
+
+```text
+Database passwords
+API keys
+JWT secrets
+Laravel APP_KEY
+Government API credentials
+Cloud credentials
+Private certificates
+Production secrets
+```
+
+These should be stored in:
+
+```text
+Environment variables
+```
+
+or, in production, a dedicated secret manager.
+
+Example:
+
+```env
+DB_PASSWORD=...
+GOVERNMENT_API_KEY=...
+```
+
+The repository should only contain:
+
+```text
+.env.example
+```
+
+with placeholder values.
+
+---
+
+# 23. Frontend
+
+The frontend is implemented using Next.js and React.
+
+It contains three primary areas:
+
+## Invoice Dashboard
+
+Displays:
+
+```text
+Invoice Number
+Customer
+Invoice Date
+Amount
+Status
+```
+
+Filtering can be supported using:
+
+```text
+status
+invoice date
+invoice number
+```
+
+Pagination is also recommended.
+
+---
+
+# 24. Create Invoice
+
+The invoice form supports:
+
+* invoice information;
+* customer information;
+* multiple invoice items;
+* adding items;
+* removing items;
+* validation;
+* submission;
+* validation error display.
+
+The user can dynamically manage invoice line items before submission.
+
+---
+
+# 25. Invoice Details
+
+The invoice details page displays:
+
+```text
+Invoice information
+Customer information
+Invoice items
+Subtotal
+Tax
+Total
+Current status
+Processing information
+Error information
+```
+
+If an invoice is in a retryable failed state, the page provides a Retry action.
+
+---
+
+# 26. External Government Service
+
+Tubo is expected to submit invoices to:
+
+```http
+POST /government-api/invoices
+```
+
+The external service can return:
+
+```text
+200 → Success
+400 → Invalid Invoice
+503 → Temporary Failure
+Timeout → No response
+```
+
+Each response must be handled differently.
+
+---
+
+# 27. External API Response Handling
+
+| Response      | Handling                          |
+| ------------- | --------------------------------- |
+| 200           | Mark invoice as `SUBMITTED`       |
+| 400           | Mark as failed/non-retryable      |
+| 503           | Retry                             |
+| Timeout       | Retry carefully                   |
+| Network Error | Retry carefully                   |
+| 429           | Retry using rate limiting/backoff |
+
+A `400 Invalid Invoice` generally should not be automatically retried because retrying the same invalid request will not correct the payload.
+
+---
+
+# 28. Asynchronous Processing
+
+The API should not wait for the government API to finish before responding to the user.
+
+Instead:
+
+```text
+Client
+  │
+  ▼
+Tubo API
+  │
+  ├── Validate
+  ├── Store
+  │
+  ▼
+Queue
+  │
+  ▼
+Worker
+  │
+  ▼
+Government API
+```
+
+The API can return:
+
+```http
+201 Created
+```
+
+once the invoice is safely stored and accepted for processing.
+
+The initial status can be:
+
+```text
+PENDING
+```
+
+---
+
+# 29. Accepting an Invoice vs Submitting an Invoice
+
+These are different events.
+
+### Accepted by Tubo
+
+Means:
+
+> Tubo successfully validated and persisted the invoice.
+
+### Submitted
+
+Means:
+
+> The external government system confirmed successful receipt.
+
+Therefore:
+
+```text
+HTTP 201 Created
+```
+
+does not necessarily mean:
+
+```text
+SUBMITTED
+```
+
+It means the invoice has entered the processing pipeline.
+
+---
+
+# 30. Retry Strategy
+
+Temporary errors should be retried using exponential backoff.
+
+Example:
+
+```text
+```
